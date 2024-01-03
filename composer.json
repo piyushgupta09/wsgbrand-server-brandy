@@ -1,0 +1,18 @@
+{
+    "name": "fpaipl/shopy",
+    "description": "it provides order managing solution",
+    "type": "library",
+    "autoload": {
+        "psr-4": {
+            "Fpaipl\\Shopy\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Piyush Gupta",
+            "email": "pg.softcode@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {}
+}
