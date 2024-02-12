@@ -1,10 +1,10 @@
 {
-    "name": "fpaipl/shopy",
+    "name": "fpaipl/brandy",
     "description": "it provides order managing solution",
     "type": "library",
     "autoload": {
         "psr-4": {
-            "Fpaipl\\Shopy\\": "src/"
+            "Fpaipl\\Brandy\\": "src/"
         }
     },
     "authors": [
