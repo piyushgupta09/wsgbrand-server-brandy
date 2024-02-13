@@ -7,20 +7,16 @@ use Fpaipl\Brandy\Util;
 use Illuminate\Support\Str;
 use Fpaipl\Brandy\Models\Po;
 use Illuminate\Http\Request;
-use Fpaipl\Prody\Models\Pomo;
-use Fpaipl\Prody\Models\Pomr;
 use Fpaipl\Brandy\Models\Chat;
 use Fpaipl\Brandy\Models\Order;
 use Fpaipl\Brandy\Models\Party;
 use Fpaipl\Brandy\Models\Ledger;
 use Fpaipl\Brandy\Models\PoItem;
-use Fpaipl\Prody\Models\Material;
 use Illuminate\Support\Facades\DB;
 use Fpaipl\Brandy\Models\OrderItem;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Fpaipl\Prody\Models\MaterialRange;
-use Fpaipl\Prody\Models\ProductOption;
 use Fpaipl\Prody\Models\MaterialOption;
 use Fpaipl\Panel\Http\Responses\ApiResponse;
 use Fpaipl\Brandy\Http\Resources\OrderResource;
@@ -30,85 +26,6 @@ use Fpaipl\Brandy\Http\Requests\OrderUpdateRequest;
 
 class OrderCoordinator extends Coordinator
 {
-    // public function index(Request $request)
-    // {
-    //     /** @var User $user */
-    //     $user = auth()->user();
-
-    //     // Determine the role for the scope
-    //     $role = $user->isManagerBrand() ? 'brand' : ($user->isManagerVendor() ? 'vendor' : ($user->isManagerFactory() ? 'factory' : null));
-    //     if (!$role) {
-    //         return ApiResponse::error('Invalid request', 422);
-    //     }
-
-    //     // Determine the query ID for the scope
-    //     $queryId = $role == 'brand' ? $user->id : $user->party->id;
-
-    //     // Determine the status for the scope
-    //     $status = $request->status ?? ($role == 'brand' ? 'rejected' : 'issued');
-
-    //     // If the status is 'issued', then we need to check if the order is accepted by the vendor
-    //     if ($status == 'issued') {
-    //         $status = $role == 'vendor' ? 'accepted' : $status;
-    //     }
-
-    //     // Determine the search for the scope
-    //     $search = $request->search ?? null;
-
-    //     if ($user->isParty()) {
-    //         $orders = Order::partyOrders($user->party->id)
-    //             ->filteredOrders($queryId, $status, $search, $role)
-    //             ->with('chats', 'chats.user', 'orderItems', 'po', 'po.poItems')
-    //             ->paginate(10);
-    //     } else {
-    //         $orders = Order::brandOrders()
-    //             ->filteredOrders($queryId, $status, $search, $role)
-    //             ->with('chats', 'chats.user', 'orderItems', 'po', 'po.poItems')
-    //             ->paginate(10);
-    //     }
-
-    //     return ApiResponse::success([
-    //         'data' => OrderResource::collection($orders),
-    //         'pagination' => [
-    //             'total' => $orders->total(),
-    //             'perPage' => $orders->perPage(),
-    //             'currentPage' => $orders->currentPage(),
-    //             'lastPage' => $orders->lastPage(),
-    //         ],
-    //     ]);
- 
-    //     // /** @var User $user */
-    //     // $user = auth()->user();
-
-    //     // // Determine the role for the scope
-    //     // $role = $user->isManagerBrand() ? 'brand' : ($user->isManagerVendor() ? 'vendor' : ($user->isManagerFactory() ? 'factory' : null));
-    //     // if (!$role) {
-    //     //     return ApiResponse::error('Invalid request', 422);
-    //     // }
-
-    //     // // Determine the query ID for the scope
-    //     // $queryId = $role == 'brand' ? $user->id : $user->party->id;
-
-    //     // // Determine the status for the scope
-    //     // $status = $request->status ?? ($role == 'brand' ? null : 'issued');
-
-    //     // // If the status is 'issued', then we need to check if the order is accepted by the vendor
-    //     // if ($status == 'issued') {
-    //     //     $status = $role == 'vendor' ? 'accepted' : $status;
-    //     // }
-
-    //     // // Determine the search for the scope
-    //     // $search = $request->search ?? null;
-
-    //     // Fetch the orders
-    //     // $orders = Order::filteredOrders(
-    //     //     $queryId, $status, $search, $role
-    //     // )->with('chats', 'chats.user', 'orderItems', 'po', 'po.poItems')->get();
-
-    //     // Return the response
-    //     // return ApiResponse::success(OrderResource::collection($orders));
-    // }
-
     public function index(Request $request)
     {
         /** @var User $user */
@@ -171,68 +88,6 @@ class OrderCoordinator extends Coordinator
         ]);
     }
 
-    // public function factoryIndex(Request $request)
-    // {
-    //     /** @var User $user */
-    //     $user = auth()->user();
-
-    //     // Determine the role for the scope
-    //     if (!$user->isFactory()) {
-    //         return ApiResponse::error('Invalid request', 422);
-    //     }
-
-    
-    //     // Determine the search for the scope
-    //     $search = $request->search ?? null;
-    //     $status = $request->status ?? null;
-        
-    //     $orders = Order::partyOrders($user->party->id)
-    //         ->filteredOrders('factory', $status, $search)
-    //         ->with('chats', 'chats.user', 'orderItems', 'po', 'po.poItems')
-    //         ->paginate(20);
-
-    //     return ApiResponse::success([
-    //         'data' => OrderResource::collection($orders),
-    //         'pagination' => [
-    //             'total' => $orders->total(),
-    //             'perPage' => $orders->perPage(),
-    //             'currentPage' => $orders->currentPage(),
-    //             'lastPage' => $orders->lastPage(),
-    //         ],
-    //     ]);
- 
-    //     // /** @var User $user */
-    //     // $user = auth()->user();
-
-    //     // // Determine the role for the scope
-    //     // $role = $user->isManagerBrand() ? 'brand' : ($user->isManagerVendor() ? 'vendor' : ($user->isManagerFactory() ? 'factory' : null));
-    //     // if (!$role) {
-    //     //     return ApiResponse::error('Invalid request', 422);
-    //     // }
-
-    //     // // Determine the query ID for the scope
-    //     // $queryId = $role == 'brand' ? $user->id : $user->party->id;
-
-    //     // // Determine the status for the scope
-    //     // $status = $request->status ?? ($role == 'brand' ? null : 'issued');
-
-    //     // // If the status is 'issued', then we need to check if the order is accepted by the vendor
-    //     // if ($status == 'issued') {
-    //     //     $status = $role == 'vendor' ? 'accepted' : $status;
-    //     // }
-
-    //     // // Determine the search for the scope
-    //     // $search = $request->search ?? null;
-
-    //     // Fetch the orders
-    //     // $orders = Order::filteredOrders(
-    //     //     $queryId, $status, $search, $role
-    //     // )->with('chats', 'chats.user', 'orderItems', 'po', 'po.poItems')->get();
-
-    //     // Return the response
-    //     // return ApiResponse::success(OrderResource::collection($orders));
-    // }
-
     public function show(Request $request, Order $order)
     {
         /** @var User $user */
@@ -254,7 +109,6 @@ class OrderCoordinator extends Coordinator
         $order = Cache::remember('order' . $order, Order::getCacheRemember(), function () use ($order) {
             return $order;
         });
-
 
         return ApiResponse::success(new OrderResource($order));
     }

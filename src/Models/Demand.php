@@ -10,10 +10,9 @@ use Spatie\Activitylog\LogOptions;
 use Fpaipl\Brandy\Models\DemandItem;
 use Fpaipl\Panel\Traits\BelongsToUser;
 use Illuminate\Database\Eloquent\Model;
-use Fpaipl\Panel\Events\PushNotification;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Fpaipl\Panel\Notifications\AppNotification;
+use Fpaipl\Panel\Notifications\WebPushNotification;
 
 class Demand extends Model 
 {
@@ -57,8 +56,8 @@ class Demand extends Model
             // Send Notification
             $title = 'New Demand';
             $message = 'You have received a new demand from ' . $model->user->name;
-            $model->ledger->party->user->notify(new AppNotification($title, $message));
-            PushNotification::dispatch($model->ledger->party->uuid, 'party-event', $title, $message);
+            $action = 'ledgers/' . $ledger->sid;
+            $model->ledger->party->user->notify(new WebPushNotification($title, $message, $action));
         });
     }
 

@@ -22,6 +22,7 @@ use Fpaipl\Panel\Http\Responses\ApiResponse;
 use Fpaipl\Panel\Http\Coordinators\Coordinator;
 use Fpaipl\Brandy\Http\Resources\DispatchResource;
 use Fpaipl\Brandy\Http\Resources\PurchaseResource;
+use Fpaipl\Panel\Notifications\WebPushNotification;
 use Fpaipl\Brandy\Http\Requests\PurchaseCreateRequest;
 
 class PurchaseCoordinator extends Coordinator
@@ -95,13 +96,6 @@ class PurchaseCoordinator extends Coordinator
             // by parsing the json string and adding all the quantities
             $receviedQuantityTotal = Util::calculateQuantity($request->quantities, 'int');
 
-            // Get the ledger from the request
-
-            // Check if the recevied quantity is greater than the balance quantity
-            // if($receviedQuantityTotal > $ledger->balance_qty){
-            //     throw new Exception('Recevied quantity can not exceed ' . $ledger->balance_qty . '.');
-            // }
-
             $purchase = Purchase::firstOrCreate(
                 [
                     'party_id' => $ledger->party_id,
@@ -126,7 +120,10 @@ class PurchaseCoordinator extends Coordinator
             Chat::createChatIfNecessary($request, $purchase);
             DB::commit();
 
-            ReloadDataEvent::dispatch(Purchase::NEW_PURCHASE_EVENT);
+            $title = 'Dispatch Accepted';
+            $message = 'Your dispatch for ' . $receviedQuantityTotal . ' pcs has been accepted.';
+            $action = 'sales/bills?search=' . $purchase->doc_id;
+            $purchase->party->user->notify(new WebPushNotification($title, $message, $action));
 
             // send back latest dispatched
             $dispatches = Dispatch::brandDispatches()->paginate(10);

@@ -12,14 +12,12 @@ use Fpaipl\Brandy\Models\Purchase;
 use Spatie\Activitylog\LogOptions;
 use Fpaipl\Panel\Traits\SearchTags;
 use Fpaipl\Brandy\Models\DispatchItem;
-use Fpaipl\Brandy\Models\PurchaseItem;
 use Fpaipl\Panel\Traits\BelongsToUser;
 use Illuminate\Database\Eloquent\Model;
-use Fpaipl\Panel\Events\PushNotification;
 use Fpaipl\Brandy\Models\PurchaseDispatch;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Fpaipl\Panel\Notifications\AppNotification;
+use Fpaipl\Panel\Notifications\WebPushNotification;
 
 class Dispatch extends Model 
 {
@@ -82,8 +80,8 @@ class Dispatch extends Model
             })->get();
             // send notification to all brand managers
             foreach ($brandManagers as $brandManager) {
-                $brandManager->notify(new AppNotification($title, $message));
-                PushNotification::dispatch($brandManager->uuid, 'brand-event', $title, $message);
+                $action = 'purchases/incomings?search=' . $ledger->sid;
+                $brandManager->notify(new WebPushNotification($title, $message, $action));
             }
         });
     }

@@ -11,7 +11,7 @@ use Fpaipl\Brandy\Models\Ledger;
 use Spatie\Activitylog\LogOptions;
 use Fpaipl\Brandy\Models\OrderItem;
 use Fpaipl\Panel\Traits\SearchTags;
-use App\Notifications\NewOrderIssued;
+use Illuminate\Support\Facades\Log;
 use Fpaipl\Panel\Traits\BelongsToUser;
 use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Database\Eloquent\Model;
@@ -19,7 +19,7 @@ use Fpaipl\Panel\Events\PushNotification;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Fpaipl\Panel\Notifications\AppNotification;
-use Illuminate\Support\Facades\Log;
+use Fpaipl\Panel\Notifications\WebPushNotification;
 
 class Order extends Model 
 {
@@ -91,16 +91,13 @@ class Order extends Model
             $title = 'New Order';
             $message = 'For ' . $model->quantity . ' pcs of #' . $model->ledger->product->code . ' from ' . $model->user->name;
             $partyUser = $model->party->user;
-            $action = 'new-orders?order=' . $model->sid;
-            Log::info([
-                'title' => $title,
-                'message' => $message,
-                'action' => $action,
-            ]);
-            $partyUser->notify(new NewOrderIssued($title, $message, $action));
-
-            // $partyUser->notify(new AppNotification($title, $message, $action));
-            // PushNotification::dispatch($model->party->uuid, 'party-event', $title, $message, $action);
+            $action = 'new-orders?search=' . $model->sid;
+            // Log::info([
+            //     'title' => $title,
+            //     'message' => $message,
+            //     'action' => $action,
+            // ]);
+            $partyUser->notify(new WebPushNotification($title, $message, $action));
         });
         static::saved(function ($model) {
             $model->queued = 0;
@@ -110,33 +107,41 @@ class Order extends Model
             $model->saveQuietly();           
         });
         static::updated(function ($model) {
-            $ledger = $model->ledger;
-            $title = 'Order Updated';
-            $message = '#' . $model->sid . ' is updated by ' . $model->party->name;
 
-            // if order is accepted then update (add) the ledger balance_qty
-            if ($model->status == self::STATUS[1]) {
-               
-                $stock = $ledger->product->stock;
-                $stock->update([
-                    'incoming' => $stock->quantity + $model->quantity,
-                ]);
+            if ($model->status == self::STATUS[0]) {
+                // If order is issued and have created_at not same as updated_at then send notification, then its a re-issued order
+                if ($model->created_at != $model->updated_at) {
+                    $title = 'Order Re-issued';
+                    $message = 'For ' . $model->quantity . ' pcs of #' . $model->ledger->product->code . ' from ' . $model->user->name;
+                    $partyUser = $model->party->user;
+                    $action = 'new-orders?search=' . $model->sid;
+                    $partyUser->notify(new WebPushNotification($title, $message, $action));
+                }
+            } elseif ($model->status == self::STATUS[5]) {
+                $title = 'Order Deleted';
+                $message = 'For ' . $model->quantity . ' pcs of #' . $model->ledger->product->code . ' from ' . $model->user->name;
+                $partyUser = $model->party->user;
+                $action = 'mydashboard';
+                $partyUser->notify(new WebPushNotification($title, $message, $action));
+            } else {
 
-                $title = 'Order Accepted';
-                $message = '#' . $model->sid . ' is acccepted by ' . $model->party->name;
+                $ledger = $model->ledger;
+                $title = Str::title('Order ' . $model->status);
+                $message = '#' . $model->sid . ' is ' . $model->status . ' by ' . $model->party->name;
+    
+                // if order is accepted then update (add) the ledger balance_qty
+                if ($model->status == self::STATUS[1]) {
+                    $stock = $ledger->product->stock;
+                    $stock->update([
+                        'incoming' => $stock->quantity + $model->quantity,
+                    ]);
+                }
+    
+                $brandUser = $model->user;
+                $action = 'purchases/pos?status=' . $model->status . '&search=' . $model->sid;
+                $brandUser->notify(new WebPushNotification($title, $message, $action));
             }
 
-            // if order is cancelled then update (subtract) the ledger balance_qty
-            if ($model->status == self::STATUS[2]) {
-                $title = 'Order Rejected';
-                $message = '#' . $model->sid . ' is rejected by ' . $model->party->name;
-            }
-
-            $brandUser = $model->user;
-            $module = $brandUser->isBrand() ? 'deshigirl/' : null;
-            $action = $module . 'purchases/pos?po=' . $model->sid;
-            $brandUser->notify(new AppNotification($title, $message, $action));
-            PushNotification::dispatch($model->party->uuid, 'party-event', $title, $message, $action);
         });
     }
 

@@ -11,10 +11,9 @@ use Spatie\Activitylog\LogOptions;
 use Fpaipl\Brandy\Models\ReadyItem;
 use Fpaipl\Panel\Traits\BelongsToUser;
 use Illuminate\Database\Eloquent\Model;
-use Fpaipl\Panel\Events\PushNotification;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Fpaipl\Panel\Notifications\AppNotification;
+use Fpaipl\Panel\Notifications\WebPushNotification;
 
 class Ready extends Model 
 {
@@ -65,7 +64,7 @@ class Ready extends Model
             ]);
             $ledger->save();
             // Send Notification
-            $title = 'New Ready';
+            $title = Str::title('New Ready by ' . $ledger->party->user->name);
             $message = '#' . $ledger->product_sid . ', has been ready for ' . $model->quantity . ' pcs.';
             // fetch all users that has role of brand manager
             $brandManagers = User::whereHas('roles', function ($query) {
@@ -73,8 +72,8 @@ class Ready extends Model
             })->get();
             // send notification to all brand managers
             foreach ($brandManagers as $brandManager) {
-                $brandManager->notify(new AppNotification($title, $message));
-                PushNotification::dispatch($brandManager->uuid, 'brand-event', $title, $message);
+                $action = 'products/ledger/' . $ledger->sid;
+                $brandManager->notify(new WebPushNotification($title, $message, $action));
             }
         });
     }
