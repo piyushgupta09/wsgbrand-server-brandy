@@ -114,8 +114,7 @@ class Employee extends Model implements HasMedia
     public function registerMediaCollections(): void {
         $this
             ->addMediaCollection($this->getMediaCollectionName())
-            ->useFallbackUrl(config('app.url') . '/storage/assets/placeholders/profile.png')
-            ->useFallbackPath(public_path('storage/assets/placeholders/profile.png'))
+            ->useFallbackUrl(config('panel.uia') . $this->name)
             ->singleFile();
     }
 
