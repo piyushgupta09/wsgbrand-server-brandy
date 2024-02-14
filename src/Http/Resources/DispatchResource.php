@@ -80,6 +80,7 @@ class DispatchResource extends JsonResource
             'items' => $groupedItems,
             // 'items' => DispatchItemResource::collection($this->dispatchItems),
             'tags' => $this->tags,
+            'is_billed' => $this->purchaseDispatch ? $this->purchaseDispatch->purchase->doc_id : false,
         ];
     }
 }

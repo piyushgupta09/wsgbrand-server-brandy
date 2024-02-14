@@ -2,6 +2,7 @@
 
 namespace Fpaipl\Brandy\Http\Resources;
 
+use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Fpaipl\Brandy\Http\Resources\UserResource;
@@ -57,6 +58,7 @@ class LedgerItemsLedgerResource extends ResourceCollection
                     'type' => $item->chats ? $item->chats->first()?->type : 'text',
                     'content' => $item->chats ? $item->chats->first()?->content : null,
                 ],
+                'created_on' => Carbon::parse($item->created_at)->format('Y-m-d'),
                 'created_at' => $item->created_at,
                 'items' => $groupedItems->values(), // Ensure the groups are represented as arrays
             ];

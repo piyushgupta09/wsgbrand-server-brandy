@@ -108,16 +108,18 @@ class PurchaseItem extends Model
             ]);
 
             $stock = $stockSku->stock;
+            $newQuantity = $stock->quantity + $qty;
+            $newIncoming = $stock->incoming - $qty;
             $stock->update([
-                'quantity' => $stock->quantity + $qty,
-                'incoming' => $stock->incoming - $qty,
+                'quantity' => $newQuantity,
+                'incoming' => $newIncoming,
             ]);
             
             // $newQty = $purchase->quantity + $qty;
             $newQty = $qty;
 
             $purchase->update([
-                'quantity' => $newQty,
+                'quantity' => $purchase->quantity + $newQty,
                 'tax' => $purchase->tax + ($newQty * $stockSku->price * 0.18), // 18% GST
                 'total' => $purchase->total + ($newQty * $stockSku->price),
             ]);

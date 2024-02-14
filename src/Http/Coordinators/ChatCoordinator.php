@@ -6,22 +6,19 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Fpaipl\Brandy\Models\Chat;
 use Fpaipl\Brandy\Models\Ledger;
-use Illuminate\Support\Facades\Cache;
-use Fpaipl\Panel\Events\ReloadDataEvent;
-use Fpaipl\Panel\Events\PushNotification;
+use Fpaipl\Prody\Models\ProductOption;
 use Fpaipl\Panel\Http\Responses\ApiResponse;
 use Fpaipl\Brandy\Http\Resources\ChatResource;
 use Fpaipl\Panel\Http\Coordinators\Coordinator;
 use Fpaipl\Brandy\Http\Requests\ChatCreateRequest;
+use Fpaipl\Panel\Notifications\WebPushNotification;
 use Fpaipl\Brandy\Http\Resources\LedgerChatResource;
-use Fpaipl\Brandy\Http\Resources\ShowProductResource;
-use Fpaipl\Prody\Models\ProductOption;
 
 class ChatCoordinator extends Coordinator
 {
     public function show(Request $request, $ledger_sid)
     {
-        $perPage = 25;
+        $perPage = 50;
     
         $ledger = Ledger::where('sid', $ledger_sid)->first();
     
@@ -79,20 +76,22 @@ class ChatCoordinator extends Coordinator
             
             $chat = Chat::createChatIfNecessary($request, $ledger, true);
 
-            $title = $ledger->sid;
-            $message = 'new-chat-msg';
+            $title = $request->user()->name . ' sent a message.';
+            $message = 'New message in ' . $ledger->name . ' ledger.';
 
             $senderIsBrand = $request->user()->isBrand();
             $senderIsParty = $request->user()->isParty();
             if ($senderIsBrand) {
-                PushNotification::dispatch($ledger->party->uuid, 'party-event', $title, $message);
+                $action = 'ledgers/chats/' . $ledger->sid;
+                $ledger->party->user->notify(new WebPushNotification($title, $message, $action));
             } elseif ($senderIsParty) {
                 $brandManagers = User::whereHas('roles', function ($query) {
                     $query->where('name', 'manager-brand');
                 })->get();
                 // send notification to all brand managers
                 foreach ($brandManagers as $brandManager) {
-                    PushNotification::dispatch($brandManager->uuid, 'brand-event', $title, $message);
+                    $action = 'products/chats/' . $ledger->sid;
+                    $brandManager->notify(new WebPushNotification($title, $message, $action));
                 }
             }        
 

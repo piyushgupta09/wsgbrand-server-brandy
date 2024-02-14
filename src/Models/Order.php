@@ -132,8 +132,9 @@ class Order extends Model
                 // if order is accepted then update (add) the ledger balance_qty
                 if ($model->status == self::STATUS[1]) {
                     $stock = $ledger->product->stock;
+                    $newIncoming = $stock->incoming + $model->quantity;
                     $stock->update([
-                        'incoming' => $stock->quantity + $model->quantity,
+                        'incoming' => $newIncoming,
                     ]);
                 }
     

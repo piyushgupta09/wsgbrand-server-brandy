@@ -151,6 +151,11 @@ class Dispatch extends Model
         return $this->hasMany(PurchaseDispatch::class);
     }
 
+    public function purchaseDispatch()
+    {
+        return $this->hasOne(PurchaseDispatch::class);
+    }
+
     public function ledger()
     {
         return $this->belongsTo(Ledger::class);

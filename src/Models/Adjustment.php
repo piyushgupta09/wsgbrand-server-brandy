@@ -2,6 +2,7 @@
 
 namespace Fpaipl\Brandy\Models;
 
+use App\Models\User;
 use Illuminate\Support\Str;
 use Fpaipl\Brandy\Models\Chat;
 use Fpaipl\Panel\Traits\Authx;
@@ -11,6 +12,7 @@ use Fpaipl\Panel\Traits\BelongsToUser;
 use Illuminate\Database\Eloquent\Model;
 use Fpaipl\Brandy\Models\AdjustmentItem;
 use Spatie\Activitylog\Traits\LogsActivity;
+use Fpaipl\Panel\Notifications\WebPushNotification;
 
 class Adjustment extends Model 
 {
@@ -34,8 +36,23 @@ class Adjustment extends Model
         static::creating(function ($model) {
             $model->sid = self::generateSid();
         });
+        static::created(function ($model) {
+            $title = 'New Adjustment';
+            $message = '#' . $model->ledger->product_sid . ', is adjusted with ' . $model->quantity . ' pcs.';
+            if ($model->type == 'ready') {
+                $brandManagers = User::whereHas('roles', function ($query) {
+                    $query->where('name', 'manager-brand');
+                })->get();
+                foreach ($brandManagers as $brandManager) {
+                    $action = 'products/ledger/' . $model->ledger->sid;
+                    $brandManager->notify(new WebPushNotification($title, $message, $action));
+                }
+            } elseif ($model->type == 'order' || $model->type == 'demand') {
+                $action = 'ledgers/' . $model->ledger->sid;
+                $model->ledger->party->user->notify(new WebPushNotification($title, $message, $action));
+            }
+        });
     }
-
 
     public static function generateSid() { 
         $count = self::all()->count();
