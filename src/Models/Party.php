@@ -88,6 +88,14 @@ class Party extends Model implements HasMedia
         static::creating(function ($model) {
             $model->sid = self::generateSid();
             $model->uuid = Str::uuid();
+            $tags = [];
+            $tags[] = $model->sid ?? '';
+            $tags[] = $model->name ?? '';
+            $tags[] = $model->mobile ?? '';
+            $tags[] = $model->business ?? '';
+            $tags[] = $model->gstin ?? '';
+            $tags[] = $model->pan ?? '';
+            $model->tags = implode(', ', $tags);
         });
     }
 

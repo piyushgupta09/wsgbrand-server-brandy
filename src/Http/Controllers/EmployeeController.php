@@ -26,7 +26,7 @@ class EmployeeController extends PanelController
             'info' => 'nullable|string|max:255',
             'name' => 'required|min:3|max:200',
             'active' => 'required|boolean',
-            'mobile' => 'required|numeric|digits:10',
+            'mobile' => 'required|numeric|digits:10|unique:users,mobile',
         ]);
 
         DB::beginTransaction();
@@ -68,19 +68,19 @@ class EmployeeController extends PanelController
         $request->validate([
             'info' => 'nullable',
             'name' => 'required',
-            'email' => 'required',
             'mobile' => 'required',
         ]);
 
-        DB::beginTransaction();
+        $user = $employee->user;
+        $user->name = $request->name;
+        $user->save();
 
-        $employee->user->update([
-            'name' => $request->name,
-        ]);
-
-        $employee->update([
-            'info' => $request->info,
-        ]);
+        $employee->name = $request->name;
+        $employee->info = $request->info;
+        $employee->mobile = $request->mobile;
+        $employee->active = $request->active;
+        $employee->tags = implode(',', $request->all());
+        $employee->save();
 
         return redirect()->route('employees.index')->with('toast', [
             'class' => 'success',

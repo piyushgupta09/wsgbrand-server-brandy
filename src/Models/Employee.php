@@ -46,6 +46,11 @@ class Employee extends Model implements HasMedia
         static::creating(function ($model) {
             $model->uuid = Str::uuid();
             $model->sid = self::generateSid();
+            $tags = [];
+            $tags[] = $model->sid ?? '';
+            $tags[] = $model->name ?? '';
+            $tags[] = $model->mobile ?? '';
+            $model->tags = implode(', ', $tags);
         });
     }
 

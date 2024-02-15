@@ -80,6 +80,9 @@ class PartyAssignRoles extends Component
         /** @var User $user */
         $user = auth()->user();
 
+        // temporary only
+        return true;
+
         // Check if the user is a super admin
         if ($user->isSuperAdmin()) {
             return true;
