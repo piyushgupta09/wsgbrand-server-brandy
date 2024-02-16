@@ -7,6 +7,7 @@ use Fpaipl\Panel\Traits\Authx;
 use Fpaipl\Brandy\Models\Dispatch;
 use Fpaipl\Brandy\Models\Purchase;
 use Spatie\Activitylog\LogOptions;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Model;
 use Fpaipl\Brandy\Models\PurchaseDispatch;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -80,6 +81,7 @@ class PurchaseItem extends Model
     {
         $ledger = $dispatch->ledger;
         $purchaseItems = [];
+        $totalDiffAmount = 0;
         foreach ($quantities as $color_size_sid => $qty) {
             [$color_sid, $size_sid] = explode('_', $color_size_sid);
             $stock_sid = $dispatch->ledger->product->slug . '_' . $color_sid . "_" . $size_sid;
@@ -91,7 +93,8 @@ class PurchaseItem extends Model
                 'dispatch_id' => $dispatch->id,
                 'ledger_id' => $ledger->id,
             ]);
-            $purchaseItems[] = PurchaseItem::create([
+            
+            $newPurchaseItem = PurchaseItem::create([
                 'purchase_id' => $purchase->id,
                 'stock_item_id' => $stockSku->id,
                 'status' => 'received',
@@ -101,6 +104,20 @@ class PurchaseItem extends Model
                 'group_id' => $group->id,
                 'dispatch_item_id' => $dispatch->dispatchItems->where('stock_item_id', $stockSku->id)->first()->id,                           
             ]);
+
+            // push to purchaseItems
+            $purchaseItems[] = $newPurchaseItem;
+
+            $diffQuantity = $dispatch->quantity - $newPurchaseItem->quantity;
+            $totalDiffAmount = $totalDiffAmount + $diffQuantity;
+            
+            $ledger->update([
+                'dispatchable_qty' => $ledger->dispatchable_qty + $diffQuantity,
+                'total_dispatch' => $ledger->total_dispatch - $diffQuantity,
+                'balance_qty' => $ledger->balance_qty + $diffQuantity,
+            ]);
+
+            Log::info('notify diff' . $diffQuantity);
 
             $stockSku->update([
                 'quantity' => $stockSku->quantity + $qty,
@@ -131,7 +148,8 @@ class PurchaseItem extends Model
         $dispatch->billed = true;
         $dispatch->save();
 
-        return $purchaseItems;
+        return $totalDiffAmount;
+        // return $purchaseItems;
     }
    
     public function getActivitylogOptions(): LogOptions

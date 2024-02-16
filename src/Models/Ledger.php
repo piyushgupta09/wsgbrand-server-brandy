@@ -11,10 +11,13 @@ use Fpaipl\Brandy\Models\Stock;
 use Fpaipl\Brandy\Models\Demand;
 use Fpaipl\Prody\Models\Product;
 use Fpaipl\Brandy\Models\Dispatch;
+use Fpaipl\Brandy\Models\Employee;
 use Spatie\Activitylog\LogOptions;
+use Fpaipl\Brandy\Models\Notigroup;
 use Fpaipl\Brandy\Models\Adjustment;
 use Fpaipl\Prody\Models\ProductOption;
 use Illuminate\Database\Eloquent\Model;
+use Fpaipl\Brandy\Models\LedgerNotigroup;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -32,10 +35,13 @@ class Ledger extends Model
         'product_id',
         'stock_id',
         'party_id',
+        'employee_id',
         'note',
         'last_activity',
         'min_qty',
         'max_qty',
+        'fee_rate',
+        'order_cap',
         'fab_rate',
         'balance_qty',
         'readyable_qty',
@@ -72,6 +78,23 @@ class Ledger extends Model
             $searchtags = array_unique($searchtags);
             $model->tags = implode(', ', $searchtags);
             $model->saveQuietly();
+
+            // Add party user to ledger notigroup
+            if ($model->party) {
+                LedgerNotigroup::create([
+                    'user_id' => $model->party->user->id,
+                    'ledger_id' => $model->id,
+                ]);
+            }
+
+            // Add employee user to ledger notigroup
+            if ($model->manager) {
+                LedgerNotigroup::create([
+                    'user_id' => $model->manager->user->id,
+                    'ledger_id' => $model->id,
+                ]);
+            }
+
         });
     }
 
@@ -153,6 +176,10 @@ class Ledger extends Model
 
     public function getNetDispatchableQty()
     {
+        $vendorDispatchableQty = $this->dispatchable_qty - $this->order_adj;
+        if ($this->party->user->isVendor()) {
+            return $vendorDispatchableQty;
+        }
         return $this->dispatchable_qty - $this->demand_adj;
     }
 
@@ -180,7 +207,7 @@ class Ledger extends Model
 
     public function getLedgerBalanceQty()
     {
-        return $this->balance_qty - $this->order_adj - $this->demand_adj;
+        return $this->balance_qty - $this->order_adj; // + $this->ready_adj - $this->demand_adj;
     }
 
     public function getUnacceptedOrders()
@@ -237,7 +264,17 @@ class Ledger extends Model
 
     public function party()
     {
-        return $this->belongsTo(Party::class);
+        return $this->belongsTo(Party::class, 'party_id');
+    }
+
+    public function manager()
+    {
+        return $this->belongsTo(Employee::class, 'employee_id');
+    }
+
+    public function notigroups()
+    {
+        return $this->hasMany(LedgerNotigroup::class, 'ledger_id');
     }
 
     public function getActivitylogOptions(): LogOptions

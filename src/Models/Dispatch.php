@@ -8,8 +8,10 @@ use Fpaipl\Brandy\Models\Chat;
 use Fpaipl\Panel\Traits\Authx;
 use Fpaipl\Brandy\Models\Party;
 use Fpaipl\Brandy\Models\Ledger;
+use Fpaipl\Brandy\Jobs\NotifyUser;
 use Fpaipl\Brandy\Models\Purchase;
 use Spatie\Activitylog\LogOptions;
+use Fpaipl\Brandy\Jobs\NotifyGroup;
 use Fpaipl\Panel\Traits\SearchTags;
 use Fpaipl\Brandy\Models\DispatchItem;
 use Fpaipl\Panel\Traits\BelongsToUser;
@@ -63,26 +65,36 @@ class Dispatch extends Model
         });
         static::created(function ($model) {
             $ledger = $model->ledger;
-            $ledger->update([
-                'last_activity' => Str::afterLast(get_class($model), '\\'),
-                'dispatchable_qty' => $ledger->dispatchable_qty - $model->quantity,
-                'total_dispatch' => $ledger->total_dispatch + $model->quantity,
-                'balance_qty' => $ledger->balance_qty - $model->quantity,
-            ]);
+            if ($ledger->party->user->isFactory()) {
+                $ledger->update([
+                    'last_activity' => Str::afterLast(get_class($model), '\\'),
+                    'dispatchable_qty' => $ledger->dispatchable_qty - $model->quantity,
+                    'total_dispatch' => $ledger->total_dispatch + $model->quantity,
+                    'balance_qty' => $ledger->balance_qty - $model->quantity,
+                ]);
+            } else if ($ledger->party->user->isVendor()) {
+                $ledger->update([
+                    'last_activity' => Str::afterLast(get_class($model), '\\'),
+                    'dispatchable_qty' => $ledger->dispatchable_qty - $model->quantity,
+                    'total_dispatch' => $ledger->total_dispatch + $model->quantity,
+                    'balance_qty' => $ledger->balance_qty - $model->quantity,
+                ]);
+            }
+
             $ledger->saveQuietly();
 
             // Send Notification
             $title = 'New Dispatch';
             $message = '#' . $ledger->product_sid . ', has been dispatched with ' . $model->quantity . ' pcs.';
-            // fetch all users that has role of brand manager
-            $brandManagers = User::whereHas('roles', function ($query) {
-                $query->where('name', 'manager-brand');
-            })->get();
-            // send notification to all brand managers
-            foreach ($brandManagers as $brandManager) {
-                $action = 'purchases/incomings?search=' . $ledger->sid;
-                $brandManager->notify(new WebPushNotification($title, $message, $action));
-            }
+            $action = 'purchases/incomings?search=' . $ledger->sid . '&status=dispatched';
+            NotifyGroup::dispatch(
+                title: $title,
+                action: $action,
+                message: $message,
+                event: 'brand-event',
+                ledgerId: $ledger->id,
+                skipId: request()->user()->uuid,
+            );
         });
     }
 

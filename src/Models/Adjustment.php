@@ -8,6 +8,7 @@ use Fpaipl\Brandy\Models\Chat;
 use Fpaipl\Panel\Traits\Authx;
 use Fpaipl\Brandy\Models\Ledger;
 use Spatie\Activitylog\LogOptions;
+use Fpaipl\Brandy\Jobs\NotifyGroup;
 use Fpaipl\Panel\Traits\BelongsToUser;
 use Illuminate\Database\Eloquent\Model;
 use Fpaipl\Brandy\Models\AdjustmentItem;
@@ -40,16 +41,25 @@ class Adjustment extends Model
             $title = 'New Adjustment';
             $message = '#' . $model->ledger->product_sid . ', is adjusted with ' . $model->quantity . ' pcs.';
             if ($model->type == 'ready') {
-                $brandManagers = User::whereHas('roles', function ($query) {
-                    $query->where('name', 'manager-brand');
-                })->get();
-                foreach ($brandManagers as $brandManager) {
-                    $action = 'products/ledger/' . $model->ledger->sid;
-                    $brandManager->notify(new WebPushNotification($title, $message, $action));
-                }
+                $action = 'products/ledger/' . $model->ledger->sid;
+                NotifyGroup::dispatch(
+                    title: $title,
+                    action: $action,
+                    message: $message,
+                    event: 'brand-event',
+                    ledgerId: $model->ledger->id,
+                    skipId: request()->user()->uuid,
+                );
             } elseif ($model->type == 'order' || $model->type == 'demand') {
                 $action = 'ledgers/' . $model->ledger->sid;
-                $model->ledger->party->user->notify(new WebPushNotification($title, $message, $action));
+                NotifyGroup::dispatch(
+                    title: $title,
+                    action: $action,
+                    message: $message,
+                    event: 'party-event',
+                    ledgerId: $model->ledger->id,
+                    skipId: request()->user()->uuid,
+                );
             }
         });
     }

@@ -89,6 +89,10 @@ class LedgerCoordinator extends Coordinator
 
     public function show(Ledger $ledger)
     {
+        if ($ledger->party->user->isVendor()) {
+            return ApiResponse::success(new LedgerResourceWithDispatch($ledger));
+        }
+
         return ApiResponse::success(new LedgerResource($ledger));
     }
 

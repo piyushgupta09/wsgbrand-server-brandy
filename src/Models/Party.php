@@ -34,8 +34,11 @@ class Party extends Model implements HasMedia
 
     const MODEL_LOG_NAME = 'party-model-log';
     const MEDIA_COLLECTION_NAME = 'party-image';
-    const MEDIA_CONVERSION_THUMB = 'party-image-thumb';
-    const MEDIA_CONVERSION_PREVIEW = 'party-image-preview';
+    const MEDIA_CONVERSION_THUMB = 's100';
+    const MEDIA_CONVERSION_CARD = 's300';
+    const MEDIA_CONVERSION_PREVIEW = 's400';
+    const MEDIA_CONVERSION_BANNER = 's800';
+    const MEDIA_CONVERSION_FULL = 's1200';
     
     // Attributes that are mass assignable
     protected $fillable = [
@@ -227,18 +230,40 @@ class Party extends Model implements HasMedia
      * @param Media|null $media
      * @return void
      */
-    public function registerMediaConversions(Media $media = null): void {
-        $this->addMediaConversion(self::MEDIA_CONVERSION_THUMB)
+    public function registerMediaConversions(Media $media = null): void
+    {
+        $this->addMediaConversion('s100')
             ->format('webp')
-            ->width(100)
+            ->width(80)
             ->height(100)
             ->sharpen(10)
             ->queued();
 
-        $this->addMediaConversion(self::MEDIA_CONVERSION_PREVIEW)
+        $this->addMediaConversion('s300')
             ->format('webp')
-            ->width(400)
+            ->width(200)
+            ->height(300)
+            ->sharpen(10)
+            ->queued();
+
+        $this->addMediaConversion('s400')
+            ->format('webp')
+            ->width(300)
             ->height(400)
+            ->sharpen(10)
+            ->queued();
+
+        $this->addMediaConversion('s800')
+            ->format('webp')
+            ->width(600)
+            ->height(800)
+            ->sharpen(10)
+            ->queued();
+
+        $this->addMediaConversion('s1200')
+            ->format('webp')
+            ->width(800)
+            ->height(1200)
             ->sharpen(10)
             ->queued();
     }

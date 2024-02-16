@@ -3,21 +3,15 @@
 namespace Fpaipl\Brandy\Http\Coordinators;
 
 use Exception;
-use Carbon\Carbon;
 use Fpaipl\Brandy\Util;
 use Illuminate\Http\Request;
 use Fpaipl\Brandy\Models\Chat;
 use Fpaipl\Brandy\Models\Party;
-use Fpaipl\Brandy\Models\Stock;
-use Fpaipl\Brandy\Models\Chatable;
 use Fpaipl\Brandy\Models\Dispatch;
 use Fpaipl\Brandy\Models\Purchase;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Cache;
+use Fpaipl\Brandy\Jobs\NotifyGroup;
 use Fpaipl\Brandy\Models\PurchaseItem;
-use Fpaipl\Panel\Events\ReloadDataEvent;
-use Fpaipl\Brandy\Http\Fetchers\DsFetcher;
-use Fpaipl\Brandy\Models\PurchaseDispatch;
 use Fpaipl\Panel\Http\Responses\ApiResponse;
 use Fpaipl\Panel\Http\Coordinators\Coordinator;
 use Fpaipl\Brandy\Http\Resources\DispatchResource;
@@ -116,14 +110,32 @@ class PurchaseCoordinator extends Coordinator
                 throw new Exception('Invalid quantities Array');
             }
 
-            PurchaseItem::createPurchaseItems($purchase, $dispatch, $quantitiesArr);
+            $diffQty = PurchaseItem::createPurchaseItems($purchase, $dispatch, $quantitiesArr);
             Chat::createChatIfNecessary($request, $purchase);
             DB::commit();
 
             $title = 'Dispatch Accepted';
-            $message = 'Your dispatch for ' . $receviedQuantityTotal . ' pcs has been accepted.';
+
+            $message = 'Your dispatch for ' . $receviedQuantityTotal . ' pcs has been accepted';
+            if ($diffQty) {
+                $message = $message . ', and ' . $diffQty . ' pcs is adjusted back to ledger balance';
+            }
+
             $action = 'sales/bills?search=' . $purchase->doc_id;
-            $purchase->party->user->notify(new WebPushNotification($title, $message, $action));
+
+            // loop thru each dispatch and filter unique ledger only
+            $uniqueLedgers = $purchase->dispatches->pluck('ledger')->unique('id');
+
+            foreach ($uniqueLedgers as $ledger) {
+                NotifyGroup::dispatch(
+                    title: $title,
+                    action: $action,
+                    message: $message,
+                    event: 'party-event',
+                    ledgerId: $ledger->id,
+                    skipId: request()->user()->uuid,
+                );
+            }
 
             // send back latest dispatched
             $dispatches = Dispatch::brandDispatches()->paginate(10);
@@ -136,6 +148,7 @@ class PurchaseCoordinator extends Coordinator
                     'lastPage' => $dispatches->lastPage(),
                 ],
             ]);
+
         } catch (\Exception $e) {
             DB::rollBack();
             return ApiResponse::error($e->getMessage(), 404);

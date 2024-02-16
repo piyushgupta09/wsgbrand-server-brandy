@@ -20,12 +20,15 @@ return new class extends Migration
             $table->foreignId('stock_id')->nullable()->constrained()->onDelete('cascade');
             $table->foreignId('product_id')->nullable()->constrained()->onDelete('cascade');
             $table->foreignId('party_id')->nullable()->constrained()->onDelete('cascade');
+            $table->foreignId('employee_id')->nullable()->constrained()->onDelete('cascade');
             
             $table->string('product_sid')->nullable(); // delete product code
 
             $table->bigInteger('min_qty')->default(0); // Alert if balance_qty < min_qty
             $table->bigInteger('max_qty')->default(0); // Alert if balance_qty > max_qty
             $table->bigInteger('fab_rate')->default(0); // Alert if balance_qty > max_qty
+            $table->bigInteger('fee_rate')->default(0); // Alert if balance_qty > max_qty
+            $table->bigInteger('order_cap')->default(0); // Alert if balance_qty > max_qty
 
             $table->bigInteger('total_order')->default(0); // Total(ready-demand) 
             $table->bigInteger('readyable_qty')->default(0); // How much he can ready
@@ -45,6 +48,15 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
             $table->unique(['product_id', 'party_id']);
+        });
+
+        Schema::create('ledger_notigroups', function (Blueprint $table) {
+            $table->id();
+            $table->string('channel'); // user uuid
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('ledger_id')->constrained()->onDelete('cascade');
+            $table->unique(['user_id', 'ledger_id']);
+            $table->timestamps();
         });
 
         // Schema::create('ledger_activities', function (Blueprint $table) {

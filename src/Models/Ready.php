@@ -7,7 +7,9 @@ use Illuminate\Support\Str;
 use Fpaipl\Brandy\Models\Chat;
 use Fpaipl\Panel\Traits\Authx;
 use Fpaipl\Brandy\Models\Ledger;
+use Fpaipl\Brandy\Jobs\NotifyUser;
 use Spatie\Activitylog\LogOptions;
+use Fpaipl\Brandy\Jobs\NotifyGroup;
 use Fpaipl\Brandy\Models\ReadyItem;
 use Fpaipl\Panel\Traits\BelongsToUser;
 use Illuminate\Database\Eloquent\Model;
@@ -36,18 +38,8 @@ class Ready extends Model
     {
         return 'sid';
     }
-    
-    //For Cache remember time
-    public static $cache_remember; 
-    
-    public static function getCacheRemember()
-    {
-        if (!isset(self::$cache_remember)) {
-            self::$cache_remember = config('api.cache.remember');
-        }
 
-        return self::$cache_remember;
-    }
+    // Events
 
     protected static function boot() {
         parent::boot();
@@ -55,26 +47,28 @@ class Ready extends Model
             $model->sid = self::generateSid();
         });
         static::created(function ($model) {
+
+            // Upadte Ledger
             $ledger = $model->ledger;
             $ledger->update([
                 'last_activity' => Str::afterLast(get_class($model), '\\'),
-                'readyable_qty' => $ledger->readyable_qty - $model->quantity,
                 'total_ready' => $ledger->total_ready + $model->quantity,
+                'readyable_qty' => $ledger->readyable_qty - $model->quantity,
                 'demandable_qty' => $ledger->demandable_qty + $model->quantity,
             ]);
-            $ledger->save();
-            // Send Notification
-            $title = Str::title('New Ready by ' . $ledger->party->user->name);
-            $message = '#' . $ledger->product_sid . ', has been ready for ' . $model->quantity . ' pcs.';
-            // fetch all users that has role of brand manager
-            $brandManagers = User::whereHas('roles', function ($query) {
-                $query->where('name', 'manager-brand');
-            })->get();
-            // send notification to all brand managers
-            foreach ($brandManagers as $brandManager) {
-                $action = 'products/ledger/' . $ledger->sid;
-                $brandManager->notify(new WebPushNotification($title, $message, $action));
-            }
+            
+            // Prepare Notification Data
+            $title = Str::title('New Ready');
+            $message = 'Batch of ' . $model->quantity . 'pcs of #' . $ledger->product_sid . ', is ready by ' . $ledger->party->user->name;
+            $action = 'products/ledger/' . $ledger->sid;
+            NotifyGroup::dispatch(
+                title: $title,
+                action: $action,
+                message: $message,
+                event: 'brand-event',
+                ledgerId: $ledger->id,
+                skipId: request()->user()->uuid,
+            );
         });
     }
 
@@ -88,7 +82,7 @@ class Ready extends Model
         return $brandPrefix . $seprator . $modelPrefix . $seprator . $serial;
     }  
 
-    // Helper Functions
+    // Scopes
 
     public function scopeStaffRedies($query, $userId, $ledgerSid = null)
     {

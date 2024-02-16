@@ -8,18 +8,16 @@ use Fpaipl\Brandy\Models\Chat;
 use Fpaipl\Panel\Traits\Authx;
 use Fpaipl\Brandy\Models\Party;
 use Fpaipl\Brandy\Models\Ledger;
+use Fpaipl\Brandy\Jobs\NotifyUser;
 use Spatie\Activitylog\LogOptions;
+use Fpaipl\Brandy\Jobs\NotifyGroup;
 use Fpaipl\Brandy\Models\OrderItem;
 use Fpaipl\Panel\Traits\SearchTags;
-use Illuminate\Support\Facades\Log;
 use Fpaipl\Panel\Traits\BelongsToUser;
 use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Database\Eloquent\Model;
-use Fpaipl\Panel\Events\PushNotification;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Fpaipl\Panel\Notifications\AppNotification;
-use Fpaipl\Panel\Notifications\WebPushNotification;
 
 class Order extends Model 
 {
@@ -53,58 +51,30 @@ class Order extends Model
     ];
 
     public const STATUS = ['issued','accepted','cancelled','rejected','completed','deleted'];
-    
-    public static function setLog($key, $order = null)
-    {
-        if($key == self::STATUS[0]){
-            $log = [['status' => $key, 'time' => date('Y-m-d H:i:s')]];
-        } else {
-            $log = json_decode($order->log_status_time, true);
-            array_push($log, ['status' => $key, 'time' => date('Y-m-d H:i:s')]);
-        }
-        return json_encode($log);
-    }
-    
+   
     public function getRouteKeyName()
     {
         return 'sid';
     }
-    
-    //For Cache remember time
-    public static $cache_remember; 
-    
-    public static function getCacheRemember()
-    {
-        if (!isset(self::$cache_remember)) {
-            self::$cache_remember = config('api.cache.remember');
-        }
 
-        return self::$cache_remember;
-    }
-
+    // Events
     protected static function boot() {
         parent::boot();
         static::creating(function ($model) {
             $model->sid = self::generateSid();
         });
         static::created(function ($model) {
-            $title = 'New Order';
-            $message = 'For ' . $model->quantity . ' pcs of #' . $model->ledger->product->code . ' from ' . $model->user->name;
-            $partyUser = $model->party->user;
-            $action = 'new-orders?search=' . $model->sid;
-            // Log::info([
-            //     'title' => $title,
-            //     'message' => $message,
-            //     'action' => $action,
-            // ]);
-            $partyUser->notify(new WebPushNotification($title, $message, $action));
-        });
-        static::saved(function ($model) {
-            $model->queued = 0;
-            $model->log_status_time = self::setLog($model->status, $model);
+            
+            // Update tags
             $priorityString = $model->party->name . ', ' . $model->ledger->product->code . ', ' . $model->ledger->product->name;
             $model = $model->updateMyTags($priorityString);
-            $model->saveQuietly();           
+            $model->saveQuietly();
+
+            // Notify the party
+            $title = 'New Order';
+            $message = 'For ' . $model->quantity . ' pcs of #' . $model->ledger->product->code . ' from ' . $model->user->name;
+            $action = 'new-orders?search=' . $model->sid;
+            self::sendNotification('party-event', $title, $message, $action, $model);
         });
         static::updated(function ($model) {
 
@@ -115,14 +85,14 @@ class Order extends Model
                     $message = 'For ' . $model->quantity . ' pcs of #' . $model->ledger->product->code . ' from ' . $model->user->name;
                     $partyUser = $model->party->user;
                     $action = 'new-orders?search=' . $model->sid;
-                    $partyUser->notify(new WebPushNotification($title, $message, $action));
+                    self::sendNotification('party-event', $title, $message, $action, $model);
                 }
             } elseif ($model->status == self::STATUS[5]) {
                 $title = 'Order Deleted';
                 $message = 'For ' . $model->quantity . ' pcs of #' . $model->ledger->product->code . ' from ' . $model->user->name;
                 $partyUser = $model->party->user;
                 $action = 'mydashboard';
-                $partyUser->notify(new WebPushNotification($title, $message, $action));
+                self::sendNotification('party-event', $title, $message, $action, $model);
             } else {
 
                 $ledger = $model->ledger;
@@ -135,15 +105,31 @@ class Order extends Model
                     $newIncoming = $stock->incoming + $model->quantity;
                     $stock->update([
                         'incoming' => $newIncoming,
+                        // also perfom auto correction of incoming due to adjustments and other reasons
                     ]);
                 }
     
-                $brandUser = $model->user;
                 $action = 'purchases/pos?status=' . $model->status . '&search=' . $model->sid;
-                $brandUser->notify(new WebPushNotification($title, $message, $action));
+                self::sendNotification('brand-event', $title, $message, $action, $model);
             }
-
+            static::saved(function ($model) {
+                $model->queued = 0;
+                $model->log_status_time = self::setLog($model->status, $model);
+                $model->saveQuietly();           
+            });
         });
+    }
+
+    public static function sendNotification($event, $title, $message, $action, $model)
+    {
+        NotifyGroup::dispatch(
+            title: $title,
+            action: $action,
+            message: $message,
+            event: $event,
+            ledgerId: $model->ledger->id,
+            skipId: request()->user()->uuid,
+        );
     }
 
     public static function generateSid() { 
@@ -157,7 +143,18 @@ class Order extends Model
         return $brandPrefix . $seprator . $modelPrefix . $seprator . $serial;
     }
 
-    // Helper Functions
+    public static function setLog($key, $order = null)
+    {
+        if($key == self::STATUS[0]){
+            $log = [['status' => $key, 'time' => date('Y-m-d H:i:s')]];
+        } else {
+            $log = json_decode($order->log_status_time, true);
+            array_push($log, ['status' => $key, 'time' => date('Y-m-d H:i:s')]);
+        }
+        return json_encode($log);
+    }
+
+    // Scopes
 
     public function scopeFilteredOrders($query, $role, $status, $search, $partyId = null)
     {
@@ -195,48 +192,6 @@ class Order extends Model
         }
     }
 
-    /**
-     * Scope a query to filter orders based on user role and optionally by status.
-     *
-     * @param \Illuminate\Database\Eloquent\Builder $query The query builder instance.
-     * @param string|null $userId The ID of the user, required for staff and fabricator roles.
-     * @param string|null $status Optional. The status to filter orders.
-     * @param string|null $role The role of the user (staff, fabricator, manager).
-     * @return \Illuminate\Database\Eloquent\Builder The modified query builder.
-     */
-    // public function scopeFilteredOrders($query, $queryId, $status, $search,  $role)
-    // {
-    //     // switch ($role) {
-    //     //     case 'brand':
-    //     //         $query->where('user_id', $queryId);
-    //     //         break;
-    //     //     case 'factory':
-    //     //     case 'vendor':
-    //     //         $query->whereHas('ledger', function ($q) use ($queryId) {
-    //     //             $q->where('party_id', $queryId);
-    //     //         });
-    //     //         break;
-    //     //     default: break;
-    //     // }
-
-    //     if ($status) {
-    //         $query->where('status', $status);
-    //     } else {
-    //         $query->whereIn('status', [self::STATUS[0], self::STATUS[1]]);
-    //     }
-
-    //     if ($search) {
-    //         $query->where(function ($q) use ($search) {
-    //             $q->where('sid', 'like', '%' . $search . '%')
-    //                 ->orWhereHas('ledger', function ($q) use ($search) {
-    //                     $q->where('name', 'like', '%' . $search . '%');
-    //                 });
-    //         });
-    //     }
-
-    //     return $query->orderBy('created_at', 'desc');
-    // }
-
     public function scopeAccepted($query)
     {
         return $query->where('status', self::STATUS[1]);
@@ -246,6 +201,8 @@ class Order extends Model
     {
         return $query->where('status', '!=', self::STATUS[3]);
     }
+
+    // Relationships
 
     public function ledger()
     {
@@ -277,24 +234,11 @@ class Order extends Model
         return $this->belongsTo(Party::class, 'party_id');
     }
 
+    // Activity Log
+
     public function getActivitylogOptions(): LogOptions
     {
-        return LogOptions::defaults()
-            ->logOnly([
-                    'id', 
-                    'sid',
-                    'ledger_id',
-                    'quantity',
-                    'expected_at',
-                    'log_status_time',
-                    'status',
-                    'user_id',
-                    'reject',
-                    'created_at', 
-                    'updated_at', 
-                    'deleted_at'
-            ])->useLogName('model_log');
+        return LogOptions::defaults()->logOnlyDirty();
     }
 
-    
 }

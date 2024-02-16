@@ -6,7 +6,9 @@ use Illuminate\Support\Str;
 use Fpaipl\Brandy\Models\Chat;
 use Fpaipl\Panel\Traits\Authx;
 use Fpaipl\Brandy\Models\Ledger;
+use Fpaipl\Brandy\Jobs\NotifyUser;
 use Spatie\Activitylog\LogOptions;
+use Fpaipl\Brandy\Jobs\NotifyGroup;
 use Fpaipl\Brandy\Models\DemandItem;
 use Fpaipl\Panel\Traits\BelongsToUser;
 use Illuminate\Database\Eloquent\Model;
@@ -57,7 +59,14 @@ class Demand extends Model
             $title = 'New Demand';
             $message = 'You have received a new demand from ' . $model->user->name;
             $action = 'ledgers/' . $ledger->sid;
-            $model->ledger->party->user->notify(new WebPushNotification($title, $message, $action));
+            NotifyGroup::dispatch(
+                title: $title,
+                action: $action,
+                message: $message,
+                event: 'party-event',
+                ledgerId: $ledger->id,
+                skipId: request()->user()->uuid,
+            );
         });
     }
 
