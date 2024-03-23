@@ -50,13 +50,13 @@ class StockItem extends Model
         'active',
         'tags',
     ];
-    
-    public static function boot()
-    {
-        parent::boot();
 
-        static::saved(function ($model) {
-            //
+    public function scopeForwsg($query)
+    {
+        return $query->whereHas('product', function ($q) {
+            $q->whereHas('productDecisions', function ($q) {
+                $q->where('inbulk', true);
+            });
         });
     }
 

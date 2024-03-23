@@ -47,15 +47,6 @@ class Stock extends Model
         'note',
         'tags',
     ];
-    
-    public static function boot()
-    {
-        parent::boot();
-
-        static::saved(function ($model) {
-            //
-        });
-    }
 
     public function getRouteKeyName()
     {

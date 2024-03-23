@@ -5,8 +5,11 @@ namespace Fpaipl\Brandy\Http\Coordinators;
 use Fpaipl\Brandy\Models\Po;
 use Illuminate\Http\Request;
 use Fpaipl\Brandy\Models\Party;
+use Fpaipl\Prody\Models\Product;
+use Fpaipl\Brandy\Models\StockItem;
 use Fpaipl\Panel\Http\Coordinators\Coordinator;
 use Fpaipl\Brandy\Http\Resources\MonaalSoResource;
+use Fpaipl\Brandy\Http\Resources\WsgProductResource;
 use Fpaipl\Brandy\Http\Resources\MonaalCustomerResource;
 
 /**
@@ -90,4 +93,75 @@ class SyncCoordinator extends Coordinator
         ]);    
     }
 
+
+    public function productsCount(Request $request, $wsgbrand)
+    {
+        $request->validate([
+            'token' => 'required|string|max:255',
+        ]);
+
+        if ($request->input('token') != config('wsg.token')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Invalid token',
+            ]);
+        }
+
+        if ($wsgbrand !== 'deshigirl') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Invalid brand',
+            ]);
+        }
+
+        $data = [
+            'products' => Product::live()->forwsg()->count(),
+            'skus' => StockItem::forwsg()->count(),
+        ];
+
+        return response()->json([
+            'data' => $data,
+            'status' => 'success',
+            'message' => 'Synced successfully',
+        ]);
+    }
+
+    public function products(Request $request, $wsgbrand)
+    {
+        $request->validate([
+            'token' => 'required|string|max:255',
+        ]);
+
+        if ($request->input('token') != config('wsg.token')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Invalid token',
+            ]);
+        }
+
+        if ($wsgbrand !== 'deshigirl') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Invalid brand',
+            ]);
+        }
+
+        $products = Product::live()->forwsg()->with(
+            'stock',
+            'stock.stockItems',
+            'productOptions', 
+            'productRanges', 
+            'productAttributes', 
+            'productMeasurements',
+            'productCollections',
+        )->get();
+        
+        $data =  WsgProductResource::collection($products);
+        
+        return response()->json([
+            'data' => $data,
+            'status' => 'success',
+            'message' => 'Synced successfully',
+        ]);
+    }
 }

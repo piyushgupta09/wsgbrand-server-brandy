@@ -39,7 +39,7 @@ return new class extends Migration
             // For ecom app
             $table->boolean('active')->default(true); // enable/disable this stock
             $table->text('note')->nullable(); // remarks for dead stock
-            $table->string('tags')->nullable();
+            $table->text('tags')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });
@@ -73,7 +73,7 @@ return new class extends Migration
             // For ecom app
             $table->boolean('active')->default(true); // enable/disable this stock
             $table->text('note')->nullable(); // remarks for dead stock
-            $table->string('tags')->nullable();
+            $table->text('tags')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

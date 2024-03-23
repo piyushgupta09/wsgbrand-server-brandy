@@ -32,9 +32,9 @@ class PartyCoordinator extends Coordinator
 
         $cacheKey = 'parties' . $request->query('role', '') . $request->query('product_sid', '') . $request->query('status', '');
 
-        if (env('APP_DEBUG')) {
+        // if (env('APP_DEBUG')) {
             Cache::forget($cacheKey);
-        }
+        // }
         
         $parties = Cache::remember($cacheKey, config('api.cache.duration'), function () use ($request) {
             if ($request->has('role') || $request->has('status')) {
