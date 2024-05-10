@@ -14,7 +14,7 @@ class BrandyDatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            PartyUserSeeder::class,
+            // PartyUserSeeder::class,
         ]);
     }
 }

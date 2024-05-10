@@ -146,22 +146,32 @@ class SyncCoordinator extends Coordinator
             ]);
         }
 
-        $products = Product::live()->forwsg()->with(
-            'stock',
-            'stock.stockItems',
-            'productOptions', 
-            'productRanges', 
-            'productAttributes', 
-            'productMeasurements',
-            'productCollections',
-        )->get();
-        
-        $data =  WsgProductResource::collection($products);
+        $data = [];
+
+        try {
+            $products = Product::live()->forwsg()->with([
+                'brand',
+                'category',
+                'tax',
+                'stock.stockItems',
+                'productOptions',
+                'productRanges',
+                'productAttributes',
+                'productMeasurements',
+                'productCollections',
+            ])->get();
+            $data =  WsgProductResource::collection($products);
+            $status = 'success';
+            $message = 'Synced successfully';
+        } catch (\Exception $e) {
+            $status = 'error';
+            $message = $e->getMessage();
+        }
         
         return response()->json([
             'data' => $data,
-            'status' => 'success',
-            'message' => 'Synced successfully',
+            'status' => $status,
+            'message' => $message,
         ]);
     }
 }

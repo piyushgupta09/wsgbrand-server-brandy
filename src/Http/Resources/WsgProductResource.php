@@ -24,25 +24,30 @@ class WsgProductResource extends JsonResource
             'moq' => $this->moq,
             'active' => $this->active,
             'tags' => $this->tags,
-
-            'brand' => $this->brand->wsg_id,
-            'category' => $this->category->wsg_id,
-            'tax' => $this->tax->wsg_id,
-
-            'in_stock' => $this->stock->quantity ? true : false,
-            'stocks' => $this->stock->stockItems->map(function ($stockItem) {
-                return [
-                    'sid' => $stockItem->sid,
-                    'sku' => $stockItem->sku,
-                    'in_stock' => $stockItem->quantity ? true : false,
-                    'product_name' => $stockItem->product_name,
-                    'product_sid' => $stockItem->product_sid,
-                    'product_code' => $stockItem->product_code,
-                    'product_option_sid' => $stockItem->product_option_sid,
-                    'product_range_sid' => $stockItem->product_range_sid,
-                    'active' => $stockItem->active,
-                ];
-            }),
+    
+            // // Use optional object to safely access foreign key IDs
+            'brand' => optional($this->brand)->wsg_id,
+            'category' => optional($this->category)->wsg_id,
+            'tax' => optional($this->tax)->wsg_id,
+    
+            // // Check if 'stock' relationship is loaded and if it exists
+            'in_stock' => optional($this->whenLoaded('stock'))->quantity ? true : false,
+            'stocks' => $this->whenLoaded('stock', function () {
+                return $this->stock->stockItems->map(function ($stockItem) {
+                    return [
+                        'sid' => $stockItem->sid,
+                        'sku' => $stockItem->sku,
+                        'in_stock' => $stockItem->quantity > 0,
+                        'product_name' => $stockItem->product_name,
+                        'product_sid' => $stockItem->product_sid,
+                        'product_code' => $stockItem->product_code,
+                        'product_option_sid' => $stockItem->product_option_sid,
+                        'product_range_sid' => $stockItem->product_range_sid,
+                        'active' => $stockItem->active,
+                    ];
+                });
+            }, []), // Return an empty array if not loaded
+    
             'product_collections' => $this->productCollections,
             'product_options' => ProductOptionResource::collection($this->whenLoaded('productOptions')->sortBy('id')),
             'product_ranges' => ProductRangeResource::collection($this->whenLoaded('productRanges')->sortBy('id')),
